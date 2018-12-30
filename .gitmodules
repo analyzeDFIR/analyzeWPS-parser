@@ -1,0 +1,3 @@
+[submodule "structures"]
+	path = structures
+	url = https://github.com/analyzeDFIR/analyzeWPS-structures.git
