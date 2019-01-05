@@ -211,12 +211,6 @@ class WPS(ByteParser):
     header = StructureProperty(0, 'header')
     property_storage_list = StructureProperty(1, 'property_storage_list', deps=['header'])
 
-    def _parse_continue(structure, result):
-        '''
-        @ByteParser._parse_continue
-        '''
-        super()._parse_continue(structure, result)
-        return False
     def _parse_property_storage_list(self):
         '''
         Args:
