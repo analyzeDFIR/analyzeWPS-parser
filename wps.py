@@ -21,6 +21,9 @@
 ## OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 ## SOFTWARE.
 
+import logging
+Logger = logging.getLogger(__name__)
+
 try:
     from lib.parsers import ByteParser
     from lib.parsers.utils import StructureProperty
@@ -35,8 +38,8 @@ class OLETypedPropertyValue(ByteParser):
     Class for parsing an Object Linking and Embedding (OLE)
     Property Set typed property value structure
     '''
-    value_type = StructureProperty(0, 'type')
-    content = StructureProperty(1, 'content', deps=['type'])
+    value_type = StructureProperty(0, 'value_type')
+    content = StructureProperty(1, 'content', deps=['value_type'])
 
     def _parse_content(self):
         '''
@@ -44,30 +47,44 @@ class OLETypedPropertyValue(ByteParser):
             N/A
         Returns:
             Any
-            Parsed value of type self.type
+            Parsed value of type self.value_type
         Preconditions:
             N/A
         '''
         # TODO: Implement content parsers based on observed values in test examples
         return None
-    def _parse_type(self):
+    def _parse_value_type(self):
         '''
         Args:
             N/A
         Returns:
             Integer
-            Property value type (see structures.OLETypedPropertyValueTypes)
+            Property value type
         Preconditions:
             N/A
         '''
-        return wpsstructs.OLETypedPropertyValueTypes.parse_stream(self.stream)
+        return None
 
-class WPSPropertyValueInteger(ByteParser):
+class WPSPropertyValue(ByteParser):
+    '''
+    Base class for WPS Property Values (name, integer) that
+    implements check for header ValueSize as 0x00
+    '''
+    header = StructureProperty(0, 'header')
+
+    def _parse_continue(self, structure, result):
+        '''
+        @ByteParser._parse_continue
+        '''
+        if not super()._parse_continue(structure, result):
+            return False
+        return not (structure == 'header' and self.header.ValueSize == 0x00)
+
+class WPSPropertyValueInteger(WPSPropertyValue):
     '''
     Class for parsing Windows Property Store serialized property
     value (integer name) within a serialized property storage structure
     '''
-    header = StructureProperty(0, 'header')
     value = StructureProperty(1, 'value', deps=['header'])
 
     def _parse_value(self):
@@ -80,11 +97,9 @@ class WPSPropertyValueInteger(ByteParser):
         Preconditions:
             N/A
         '''
-        if self.header.ValueSize == 0x00:
-            return None
         # TODO: Make sure the arithmetic of stream size calculation is right
         return OLETypedPropertyValue(
-            self.stream.getvalue()[self.stream.tell():( self.header.ValueSize - 4 )]
+            self.source[self.stream.tell():( self.header.ValueSize - 4 )]
         ).parse()
     def _parse_header(self):
         '''
@@ -97,16 +112,13 @@ class WPSPropertyValueInteger(ByteParser):
         Preconditions:
             N/A
         '''
-        return self._clean_value(
-            wpsstructs.WPSPropertyValueIntegerNameHeader.parse_stream(self.stream)
-        )
+        return wpsstructs.WPSPropertyValueIntegerNameHeader.parse_stream(self.stream)
 
-class WPSPropertyValueString(ByteParser):
+class WPSPropertyValueString(WPSPropertyValue):
     '''
     Class for parsing Windows Property Store serialized property
     value (string name) within a serialized property storage structure
     '''
-    header = StructureProperty(0, 'header')
     name = StructureProperty(1, 'name', deps=['header'])
     value = StructureProperty(2, 'value', deps=['header'])
 
@@ -144,9 +156,7 @@ class WPSPropertyValueString(ByteParser):
         Preconditions:
             N/A
         '''
-        return self._clean_value(
-            wpsstructs.WPSPropertyValueStringNameHeader.parse_stream(self.stream)
-        )
+        return wpsstructs.WPSPropertyValueStringNameHeader.parse_stream(self.stream)
 
 class WPSPropertyStorage(ByteParser):
     '''
@@ -177,15 +187,15 @@ class WPSPropertyStorage(ByteParser):
             property_value_class = WPSPropertyValueString
         else:
             property_value_class = WPSPropertyValueInteger
-        while self.stream.tell() < ( self.header.Size + 4 ):
+        while self.stream.tell() < self.header.Size:
             original_position = self.stream.tell()
-            property_value = property_value_class(self.stream.getvalue()[original_position:])
+            property_value = property_value_class(self.source[original_position:])
             property_value.parse()
             if property_value.header.ValueSize == 0x00:
                 break
             self.stream.seek(original_position + property_value.header.ValueSize)
             property_value_list.append(property_value)
-        return self._clean_value(property_value_list)
+        return property_value_list
     def _parse_header(self):
         '''
         Args:
@@ -196,7 +206,7 @@ class WPSPropertyStorage(ByteParser):
         Preconditions:
             N/A
         '''
-        return self._clean_value(wpsstructs.WPSPropertyStorageHeader.parse_stream(self.stream))
+        return wpsstructs.WPSPropertyStorageHeader.parse_stream(self.stream)
 
 class WPS(ByteParser):
     '''
@@ -216,15 +226,15 @@ class WPS(ByteParser):
             N/A
         '''
         property_storage_list = list()
-        while self.stream.tell() < self.header.Size:
+        while self.stream.tell() < ( self.header.Size - 0x04 ):
             original_position = self.stream.tell()
-            property_storage = WPSPropertyStorage(self.stream.getvalue()[original_position:])
+            property_storage = WPSPropertyStorage(self.source[original_position:])
             property_storage.parse()
             if property_storage.header.Size == 0x00:
                 break
             self.stream.seek(original_position + property_storage.header.Size)
             property_storage_list.append(property_storage)
-        return self._clean_value(property_storage_list)
+        return property_storage_list
     def _parse_header(self):
         '''
         Args:
@@ -235,4 +245,4 @@ class WPS(ByteParser):
         Preconditions:
             N/A
         '''
-        return self._clean_value(wpsstructs.WPSPropertyStoreHeader.parse_stream(self.stream))
+        return wpsstructs.WPSPropertyStoreHeader.parse_stream(self.stream)
