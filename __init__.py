@@ -22,7 +22,7 @@
 ## SOFTWARE.
 
 from .wps import \
-    WPS, 
-    WPSPropertyStorage, 
-    WPSPropertyValueInteger, 
+    WPS, \
+    WPSPropertyStorage, \
+    WPSPropertyValueInteger, \
     WPSPropertyValueString
