@@ -27,43 +27,13 @@ Logger = logging.getLogger(__name__)
 try:
     from lib.parsers import ByteParser
     from lib.parsers.utils import StructureProperty
+    from lib.oleps import OLETypedPropertyValue
     from structures import wps as wpsstructs
 except ImportError:
     from .lib.parsers import ByteParser
     from .lib.parsers.utils import StructureProperty
+    from .lib.oleps import OLETypedPropertyValue
     from .structures import wps as wpsstructs
-
-class OLETypedPropertyValue(ByteParser):
-    '''
-    Class for parsing an Object Linking and Embedding (OLE)
-    Property Set typed property value structure
-    '''
-    value_type = StructureProperty(0, 'value_type')
-    content = StructureProperty(1, 'content', deps=['value_type'])
-
-    def _parse_content(self):
-        '''
-        Args:
-            N/A
-        Returns:
-            Any
-            Parsed value of type self.value_type
-        Preconditions:
-            N/A
-        '''
-        # TODO: Implement content parsers based on observed values in test examples
-        return None
-    def _parse_value_type(self):
-        '''
-        Args:
-            N/A
-        Returns:
-            Integer
-            Property value type
-        Preconditions:
-            N/A
-        '''
-        return None
 
 class WPSPropertyValue(ByteParser):
     '''
@@ -97,9 +67,8 @@ class WPSPropertyValueInteger(WPSPropertyValue):
         Preconditions:
             N/A
         '''
-        # TODO: Make sure the arithmetic of stream size calculation is right
         return OLETypedPropertyValue(
-            self.source[self.stream.tell():( self.header.ValueSize - 4 )]
+            self.source[self.stream.tell():( self.header.ValueSize )]
         ).parse()
     def _parse_header(self):
         '''

@@ -4,3 +4,6 @@
 [submodule "lib/parsers"]
 	path = lib/parsers
 	url = https://github.com/analyzeDFIR/libadfir-parser.git
+[submodule "lib/oleps"]
+	path = lib/oleps
+	url = https://github.com/analyzeDFIR/liboleps.git
